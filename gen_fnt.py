@@ -144,8 +144,8 @@ class TextureMerger:
     def get_images(self):
         files = os.listdir('.')
         for filename in files:
-            name, ext = filename.split('.')
-            if ext.lower() == 'png':
+            name, ext = os.path.splitext(filename)
+            if ext == '.png':
                 if len(name) == 1:
                     new_char = CharDef(ord(name), filename)
                     self.charset.add_new_char(new_char)
@@ -231,8 +231,13 @@ class FntGenerator:
 
 
 if __name__ == '__main__':
+    current_dir = os.path.abspath(".")
+    os.chdir(current_dir)
+
+    basename = os.path.basename(current_dir)
+    
     fnt_config = FntConfig()
-    full_path = os.path.abspath('.')
-    cur_path = full_path #full_path.split('/')[-1]
+    full_path = current_dir
+    cur_path = full_path.split('/')[-1]
     fnt_generator = FntGenerator(cur_path)
     fnt_generator.gen_fnt()
