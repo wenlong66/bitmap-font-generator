@@ -12,6 +12,15 @@ from PIL import Image
 import os
 import re
 
+head = '<?xml version="1.0"?>\n<font>\n'
+end = '</font>'
+
+def getVStr(s):
+    if type(s) == "int":
+        return s
+    else:
+        return str(s)
+
 
 def format_str(func):
     def wrapper(*args, **kw):
@@ -27,41 +36,43 @@ def format_str(func):
 
 class FntConfig:
     def __init__(self):
+        self.padding = (0,0,0,0)
+        self.spacing = (1,1)
         self.info = {
             "face": "NA",
-            "size": 16,
-            "bold": 0,
-            "italic": 0,
+            "size": "32",
+            "bold": "0",
+            "italic": "0",
             "charset": "",
-            "unicode": 1,
-            "stretchH": 100,
-            "smooth": 1,
-            "aa": 1,
-            "padding": (0, 0, 0, 0),
-            "spacing": (1, 1),
+            "unicode": "1",
+            "stretchH": "100",
+            "smooth": "1",
+            "aa": "1",
+            "padding": str(self.padding),
+            "spacing": str(self.spacing),
         }
 
         self.common = {
-            "lineHeight": 19,
-            "base": 26,
-            "scaleW": 256,
-            "scaleH": 256,
-            "pages": 1,
-            "packed": 0
+            "lineHeight": "32",
+            "base": "26",
+            "scaleW": "128",
+            "scaleH": "128",
+            "pages": "1",
+            "packed": "0"
         }
 
         self.pages = {}
 
     @format_str
     def __str__(self):
-        return 'info ' + str(self.info) + '\ncommon ' + str(self.common) + '\n'
+        return '<info ' + str(self.info) + '/>\n<common ' + str(self.common) + '/>\n'
 
 
 class CharDef:
     def __init__(self, id, file):
         self.file = file
         self.param = {
-            "id": id,
+            "id": str(id),
             "x": 0,
             "y": 0,
             "width": 0,
@@ -70,27 +81,27 @@ class CharDef:
             "yoffset": 0,
             "xadvance": 0,
             "page": 0,
-            "chnl": 15
+            "chnl": "15"
         }
         img = Image.open(self.file)
         self.ini_with_texture_size(img.size)
 
     @format_str
     def __str__(self):
-        return 'char ' + str(self.param)
+        return '<char ' + str(self.param) + '/>'
 
     def ini_with_texture_size(self, size):
-        padding = fnt_config.info["padding"]
-        self.param["width"], self.param["height"] = size[0] + padding[1] + padding[3], size[1] + padding[0] + padding[2]
-        self.param["xadvance"] = size[0]
-        self.param["xoffset"] = - padding[1]
-        self.param["yoffset"] = - padding[0]
+        padding = fnt_config.padding
+        self.param["width"], self.param["height"] = str(size[0] + padding[1] + padding[3]), str(size[1] + padding[0] + padding[2])
+        self.param["xadvance"] = str(size[0])
+        self.param["xoffset"] = str(-padding[1])
+        self.param["yoffset"] = str(-padding[0])
 
     def set_texture_position(self, position):
-        self.param["x"], self.param["y"] = position
+        self.param["x"], self.param["y"] = map(lambda v: str(v),position)
 
     def set_page(self, page_id):
-        self.param["page"] = page_id
+        self.param["page"] = str(page_id)
 
 
 class CharSet:
@@ -98,8 +109,9 @@ class CharSet:
         self.chars = []
 
     def __str__(self):
-        ret = 'chars count=' + str(len(self.chars)) + '\n'
-        ret += reduce(lambda char1, char2: str(char1) + str(char2) + "\n", self.chars, "")
+        ret = '<chars count="' + str(len(self.chars)) + '">\n'
+        ret += reduce(lambda char1, char2: str(char1) + str(char2) + '\n', self.chars, "")
+        ret += '</chars>\n'
         return ret
 
     def add_new_char(self, new_char):
@@ -113,13 +125,13 @@ class CharSet:
 class PageDef:
     def __init__(self, page_id, file):
         self.param = {
-            "id": page_id,
+            "id": str(page_id),
             "file": file
         }
 
     @format_str
     def __str__(self):
-        return 'page ' + str(self.param)
+        return '<pages> \n<page ' + str(self.param) + '/>\n</pages>'
 
 
 class TextureMerger:
@@ -150,21 +162,21 @@ class TextureMerger:
         file_name += '.png'
         try:
             texture_to_save.save(file_name, 'PNG')
-            self.pages.append(PageDef(current_page_id, file_name))
+            self.pages.append(PageDef(current_page_id, os.path.basename(file_name)))
         except IOError:
             print("IOError: save file failed: " + file_name)
 
     def next_page(self, texture_to_save):
         if texture_to_save:
             self.save_page(texture_to_save)
-        texture_w, texture_h = fnt_config.common["scaleW"], fnt_config.common["scaleH"]
+        texture_w, texture_h = int(fnt_config.common["scaleW"]), int(fnt_config.common["scaleH"])
         return Image.new('RGBA', (texture_w, texture_h), (0, 0, 0, 0))
 
     def gen_texture(self):
         self.get_images()
         texture = self.next_page(None)
-        padding = fnt_config.info['padding']
-        spacing = fnt_config.info['spacing']
+        padding = fnt_config.padding
+        spacing = fnt_config.spacing
         pos_x, pos_y, row_h = 0, 0, 0
         for char in self.charset.chars:
             img = Image.open(char.file)
@@ -205,11 +217,14 @@ class FntGenerator:
     def gen_fnt(self):
         self.textureMerger.gen_texture()
         fnt_file_name = self.fnt_name + '.fnt'
+        print(fnt_file_name)
         try:
             with open(fnt_file_name, 'w', encoding='utf8') as fnt:
+                fnt.write(head)
                 fnt.write(str(fnt_config))
                 fnt.write(self.textureMerger.pages_to_str())
                 fnt.write(str(self.textureMerger.charset))
+                fnt.write(end)
             fnt.close()
         except IOError:
             print("IOError: save file failed: " + fnt_file_name)
@@ -218,6 +233,6 @@ class FntGenerator:
 if __name__ == '__main__':
     fnt_config = FntConfig()
     full_path = os.path.abspath('.')
-    cur_path = full_path.split('/')[-1]
+    cur_path = full_path #full_path.split('/')[-1]
     fnt_generator = FntGenerator(cur_path)
     fnt_generator.gen_fnt()
